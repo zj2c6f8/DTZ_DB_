@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DTZ DB — Cloud NoSQL &amp; Live Site Console</title>
+  <title>DTZ DB — Cloud NoSQL &amp; Bot Engine</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body {
@@ -87,7 +87,7 @@
     }
     a { color: #ffffff; text-decoration: underline; }
     .hidden { display: none; }
-    .msg { margin-top: 10px; font-size: 0.84rem; color: #ffffff; opacity: 0.88; }
+    .msg { margin-top: 10px; font-size: 0.84rem; color: #ffffff; opacity: 0.9; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -95,7 +95,7 @@
     <div class="glass header">
       <div>
         <div class="brand">DTZ <span>DB</span></div>
-        <div class="sub">NoSQL Cloud + Instant Live Site Hosting</div>
+        <div class="sub">NoSQL Cloud + Bot Session/Config/Economy + Live Site Host</div>
       </div>
       <div class="row">
         <span id="userBadge" class="pill hidden"></span>
@@ -104,14 +104,14 @@
       </div>
     </div>
 
-    <!-- AUTH: AUTO GENERATE OR LOGIN WITH SAVED USERNAME/PASSWORD -->
+    <!-- AUTH -->
     <div id="authSection" class="glass" style="max-width: 470px; margin: 26px auto;">
       <h2 style="font-size: 1.22rem; margin-bottom: 6px;">DTZ DB Access</h2>
       <div class="sub" style="margin-bottom: 14px;">
         Auto-generate a Username &amp; Password right now, or sign in with your saved credentials.
       </div>
 
-      <button class="btn-white" style="width:100%; padding:12px;" onclick="autoGenerateAccount()">
+      <button id="autoGenBtn" class="btn-white" style="width:100%; padding:12px;" onclick="autoGenerateAccount()">
         ⚡ Auto-Generate Username &amp; Password
       </button>
 
@@ -124,7 +124,7 @@
       <input id="username" placeholder="dtz_xxxxxx" />
       <label>Password</label>
       <input id="password" type="password" placeholder="••••••••" />
-      <button class="btn-glass" style="width:100%; margin-top:4px;" onclick="loginAccount()">Login</button>
+      <button id="loginBtn" class="btn-glass" style="width:100%; margin-top:4px;" onclick="loginAccount()">Login</button>
       <div id="authMsg" class="msg"></div>
     </div>
 
@@ -153,6 +153,27 @@
         </div>
       </div>
 
+      <!-- BOT CONFIG & ECONOMY TESTER -->
+      <div class="glass" style="margin-top: 16px;">
+        <h3 style="font-size: 1.05rem; margin-bottom: 4px;">Bot Group/Chat Config Manager</h3>
+        <div class="sub" style="margin-bottom: 10px;">Save or read live bot flags (`antilink`, `welcome`, `prefix`) per chat/group ID</div>
+        <div class="grid">
+          <div>
+            <label>Scope ID (Chat / Group ID)</label>
+            <input id="cfgScope" value="120363000000@g.us" />
+          </div>
+          <div>
+            <label>Settings JSON</label>
+            <input id="cfgJson" value='{"antilink":true,"welcome":true,"prefix":"."}' />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-white" onclick="saveBotConfig()">Save Config</button>
+          <button class="btn-glass" onclick="getBotConfig()">Load Config</button>
+        </div>
+        <div id="cfgOutput" class="code-box hidden" style="margin-top:10px;"></div>
+      </div>
+
       <!-- LIVE SITE HOSTING FROM DTZ DB -->
       <div class="glass" style="margin-top: 16px;">
         <h3 style="font-size: 1.05rem; margin-bottom: 4px;">Host a Live Website from DTZ DB</h3>
@@ -168,10 +189,9 @@
           </div>
         </div>
         <label>HTML Code</label>
-        <textarea id="siteHtml" rows="5">&lt;!DOCTYPE html&gt;
+        <textarea id="siteHtml" rows="4">&lt;!DOCTYPE html&gt;
 &lt;html&gt;&lt;body style="background:#090b10;color:#fff;font-family:sans-serif;padding:30px"&gt;
   &lt;h1&gt;Live on DTZ DB!&lt;/h1&gt;
-  &lt;p&gt;Hosted directly from DTZ DB console.&lt;/p&gt;
 &lt;/body&gt;&lt;/html&gt;</textarea>
         <button class="btn-white" onclick="publishSite()">Publish Live Site</button>
         <div id="sitePublishMsg" class="msg"></div>
@@ -214,40 +234,69 @@
 
   <script>
     let session = JSON.parse(localStorage.getItem('dtz_db_session') || 'null');
-    if (session) showDashboard();
+    if (session && session.apiKey) showDashboard();
+
+    async function safeJson(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch { return { status: false, error: text || `HTTP ${res.status}` }; }
+    }
 
     async function autoGenerateAccount() {
-      document.getElementById('authMsg').innerText = 'Generating account...';
-      const res = await fetch('/api/auth/auto-register', { method: 'POST' });
-      const data = await res.json();
-      if (!data.status) {
-        document.getElementById('authMsg').innerText = data.error || 'Failed to generate';
-        return;
+      const btn = document.getElementById('autoGenBtn');
+      const msg = document.getElementById('authMsg');
+      btn.disabled = true;
+      msg.innerText = 'Generating username & password...';
+      try {
+        const res = await fetch('/api/auth/auto-register', { method: 'POST' });
+        const data = await safeJson(res);
+        if (!res.ok || !data.status) {
+          msg.innerText = data.error || 'Auto-generate failed';
+          btn.disabled = false;
+          return;
+        }
+        session = data;
+        localStorage.setItem('dtz_db_session', JSON.stringify(data));
+        const box = document.getElementById('autoCredBox');
+        box.classList.remove('hidden');
+        box.innerText = `Generated!\nUsername: ${data.username}\nPassword: ${data.password}`;
+        showDashboard();
+      } catch (err) {
+        msg.innerText = 'Network error: ' + err.message;
+        btn.disabled = false;
       }
-      session = data;
-      localStorage.setItem('dtz_db_session', JSON.stringify(data));
-      const box = document.getElementById('autoCredBox');
-      box.classList.remove('hidden');
-      box.innerText = `Generated!\nUsername: ${data.username}\nPassword: ${data.password}`;
-      showDashboard();
     }
 
     async function loginAccount() {
-      const username = document.getElementById('username').value;
+      const btn = document.getElementById('loginBtn');
+      const msg = document.getElementById('authMsg');
+      const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if (!data.status) {
-        document.getElementById('authMsg').innerText = data.error || 'Login failed';
+      if (!username || !password) {
+        msg.innerText = 'Please enter both username and password.';
         return;
       }
-      session = data;
-      localStorage.setItem('dtz_db_session', JSON.stringify(data));
-      showDashboard();
+      btn.disabled = true;
+      msg.innerText = 'Signing in...';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await safeJson(res);
+        if (!res.ok || !data.status) {
+          msg.innerText = data.error || 'Invalid credentials';
+          btn.disabled = false;
+          return;
+        }
+        session = data;
+        localStorage.setItem('dtz_db_session', JSON.stringify(data));
+        showDashboard();
+      } catch (err) {
+        msg.innerText = 'Network error: ' + err.message;
+        btn.disabled = false;
+      }
     }
 
     function logout() {
@@ -264,7 +313,7 @@
       badge.innerText = '@' + session.username;
       badge.classList.remove('hidden');
       document.getElementById('dashUserBox').innerText = session.username;
-      document.getElementById('dashPassBox').innerText = session.password || '(saved account)';
+      document.getElementById('dashPassBox').innerText = session.password || '(not saved locally)';
       document.getElementById('apiKeyBox').innerText = session.apiKey;
       document.getElementById('uriBox').innerText = session.connectionUri;
       loadStats();
@@ -277,6 +326,35 @@
       alert('Copied!');
     }
 
+    async function saveBotConfig() {
+      let settings;
+      try { settings = JSON.parse(document.getElementById('cfgJson').value); }
+      catch { return alert('Invalid Settings JSON'); }
+      const scopeId = document.getElementById('cfgScope').value.trim();
+      const res = await fetch('/api/v1/config/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({ scopeId, settings })
+      });
+      const data = await safeJson(res);
+      const out = document.getElementById('cfgOutput');
+      out.classList.remove('hidden');
+      out.innerText = JSON.stringify(data, null, 2);
+    }
+
+    async function getBotConfig() {
+      const scopeId = document.getElementById('cfgScope').value.trim();
+      const res = await fetch('/api/v1/config/get', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({ scopeId })
+      });
+      const data = await safeJson(res);
+      const out = document.getElementById('cfgOutput');
+      out.classList.remove('hidden');
+      out.innerText = JSON.stringify(data, null, 2);
+    }
+
     async function publishSite() {
       const title = document.getElementById('siteTitle').value;
       const slug = document.getElementById('siteSlug').value;
@@ -286,7 +364,7 @@
         headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
         body: JSON.stringify({ title, slug, html })
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       const msg = document.getElementById('sitePublishMsg');
       if (!data.status) {
         msg.innerText = data.error || 'Publish failed';
@@ -298,7 +376,7 @@
 
     async function loadSites() {
       const res = await fetch('/api/sites/list', { headers: { 'x-api-key': session.apiKey } });
-      const data = await res.json();
+      const data = await safeJson(res);
       const wrap = document.getElementById('sitesList');
       if (!data.sites || data.sites.length === 0) {
         wrap.innerHTML = '<div class="sub">No live sites published yet.</div>';
@@ -327,7 +405,7 @@
 
     async function loadStats() {
       const res = await fetch('/api/dashboard/stats', { headers: { 'x-api-key': session.apiKey } });
-      const data = await res.json();
+      const data = await safeJson(res);
       const grid = document.getElementById('statsGrid');
       if (!data.stats || data.stats.length === 0) {
         grid.innerHTML = '<div class="sub">No collections yet. Insert a document below.</div>';
@@ -361,7 +439,7 @@
           document: parsed
         })
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.status) { loadStats(); loadDocs(); }
       else alert(data.error);
     }
@@ -385,7 +463,7 @@
           filter
         })
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       const list = document.getElementById('docsList');
       if (!data.documents || data.documents.length === 0) {
         list.innerHTML = '<div class="sub" style="margin-top:10px;">No matching documents found.</div>';
@@ -418,7 +496,7 @@
         headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
         body: JSON.stringify({ data: parsed })
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.status) loadDocs();
       else alert(data.error);
     }
