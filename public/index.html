@@ -3,57 +3,91 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DTZ DB — Cloud NoSQL Dashboard</title>
+  <title>DTZ DB — Cloud NoSQL &amp; Live Site Console</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body {
       min-height: 100vh;
-      background: radial-gradient(circle at top left, rgba(239, 68, 68, 0.16), transparent 40%),
-                  radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.14), transparent 45%),
-                  #07090d;
-      color: #e5e7eb;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(255, 255, 255, 0.14), transparent 38%),
+        radial-gradient(circle at 88% 85%, rgba(255, 255, 255, 0.08), transparent 42%),
+        linear-gradient(165deg, #06070a 0%, #0e1117 55%, #07080b 100%);
+      color: #f8fafc;
       padding: 20px;
     }
-    .container { max-width: 980px; margin: 0 auto; }
+    .container { max-width: 1040px; margin: 0 auto; }
     .glass {
-      background: rgba(17, 22, 31, 0.72);
-      backdrop-filter: blur(14px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      background: rgba(255, 255, 255, 0.055);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
     }
-    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-    .brand { font-size: 1.4rem; font-weight: 800; letter-spacing: 1px; color: #fff; }
-    .brand span { color: #ef4444; }
-    .badge { font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-    input, textarea, select {
-      width: 100%; padding: 11px 13px; border-radius: 10px;
-      background: rgba(8, 11, 17, 0.85); border: 1px solid rgba(255,255,255,0.12);
-      color: #fff; margin-top: 6px; margin-bottom: 12px; font-size: 0.92rem;
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+    }
+    .brand { font-size: 1.45rem; font-weight: 800; letter-spacing: 0.8px; color: #ffffff; }
+    .brand span {
+      background: #ffffff; color: #090b10;
+      padding: 1px 8px; border-radius: 7px; margin-left: 4px; font-weight: 900;
+    }
+    .sub { font-size: 0.82rem; color: rgba(248, 250, 252, 0.68); margin-top: 2px; }
+    .pill {
+      font-size: 0.75rem; font-weight: 700; padding: 5px 11px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1); color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    label { display: block; font-size: 0.8rem; color: rgba(248, 250, 252, 0.78); margin-top: 8px; }
+    input, textarea {
+      width: 100%; padding: 11px 13px; border-radius: 11px;
+      background: rgba(5, 7, 11, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff; margin-top: 6px; margin-bottom: 10px; font-size: 0.9rem;
+      outline: none; transition: border-color 0.18s, background 0.18s;
+    }
+    input:focus, textarea:focus {
+      border-color: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.08);
     }
     button {
-      cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px;
-      font-weight: 600; font-size: 0.9rem; transition: 0.18s;
+      cursor: pointer; border-radius: 11px; padding: 10px 16px;
+      font-weight: 700; font-size: 0.88rem; transition: 0.18s;
     }
-    .btn-red { background: #ef4444; color: #fff; }
-    .btn-red:hover { background: #dc2626; }
-    .btn-green { background: #22c55e; color: #052e16; }
-    .btn-ghost { background: rgba(255,255,255,0.07); color: #e5e7eb; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+    .btn-white { background: #ffffff; color: #090b10; border: 1px solid #ffffff; }
+    .btn-white:hover { background: rgba(255, 255, 255, 0.88); }
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.08); color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .btn-glass:hover { background: rgba(255, 255, 255, 0.16); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+    .divider { height: 1px; background: rgba(255, 255, 255, 0.14); margin: 16px 0; }
     .code-box {
-      background: #05070a; border: 1px solid rgba(255,255,255,0.1);
-      padding: 10px 12px; border-radius: 10px; font-family: monospace;
-      font-size: 0.82rem; color: #86efac; word-break: break-all; margin: 8px 0;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 11px 13px; border-radius: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem; color: #ffffff; word-break: break-all; margin: 6px 0 12px;
     }
-    .doc-card {
-      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 12px; margin-top: 10px;
+    .col-card, .doc-card {
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px; padding: 14px; margin-top: 10px;
     }
-    pre { font-family: monospace; font-size: 0.8rem; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; }
+    .col-card { cursor: pointer; margin-top: 0; transition: 0.18s; }
+    .col-card:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.36); }
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem; color: rgba(248, 250, 252, 0.9);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    a { color: #ffffff; text-decoration: underline; }
     .hidden { display: none; }
-    .msg { margin-top: 8px; font-size: 0.85rem; color: #fca5a5; }
+    .msg { margin-top: 10px; font-size: 0.84rem; color: #ffffff; opacity: 0.88; }
   </style>
 </head>
 <body>
@@ -61,62 +95,117 @@
     <div class="glass header">
       <div>
         <div class="brand">DTZ <span>DB</span></div>
-        <div style="font-size: 0.8rem; color: #9ca3af;">MongoDB-Style Cloud NoSQL Engine</div>
+        <div class="sub">NoSQL Cloud + Instant Live Site Hosting</div>
       </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span class="badge">● ONLINE</span>
-        <button id="logoutBtn" class="btn-ghost hidden" onclick="logout()">Logout</button>
+      <div class="row">
+        <span id="userBadge" class="pill hidden"></span>
+        <span class="pill">● ONLINE</span>
+        <button id="logoutBtn" class="btn-glass hidden" onclick="logout()">Logout</button>
       </div>
     </div>
 
-    <!-- AUTH CARD -->
-    <div id="authSection" class="glass" style="max-width: 440px; margin: 30px auto;">
-      <h2 id="authTitle" style="margin-bottom: 14px;">Login to DTZ DB</h2>
-      <label style="font-size:0.85rem;">Username</label>
-      <input id="username" placeholder="e.g. sithuwa" />
-      <label style="font-size:0.85rem;">Password</label>
-      <input id="password" type="password" placeholder="••••••••" />
-      <div class="row">
-        <button id="authSubmit" class="btn-red" style="flex:1;" onclick="submitAuth()">Login</button>
-        <button class="btn-ghost" onclick="toggleAuthMode()" id="toggleAuthBtn">Create Account</button>
+    <!-- AUTH: AUTO GENERATE OR LOGIN WITH SAVED USERNAME/PASSWORD -->
+    <div id="authSection" class="glass" style="max-width: 470px; margin: 26px auto;">
+      <h2 style="font-size: 1.22rem; margin-bottom: 6px;">DTZ DB Access</h2>
+      <div class="sub" style="margin-bottom: 14px;">
+        Auto-generate a Username &amp; Password right now, or sign in with your saved credentials.
       </div>
+
+      <button class="btn-white" style="width:100%; padding:12px;" onclick="autoGenerateAccount()">
+        ⚡ Auto-Generate Username &amp; Password
+      </button>
+
+      <div id="autoCredBox" class="code-box hidden" style="margin-top:12px;"></div>
+
+      <div class="divider"></div>
+
+      <div class="sub" style="margin-bottom: 6px;">Returning? Sign in with your Username &amp; Password:</div>
+      <label>Username</label>
+      <input id="username" placeholder="dtz_xxxxxx" />
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••" />
+      <button class="btn-glass" style="width:100%; margin-top:4px;" onclick="loginAccount()">Login</button>
       <div id="authMsg" class="msg"></div>
     </div>
 
-    <!-- DASHBOARD SECTION -->
+    <!-- DASHBOARD -->
     <div id="dashSection" class="hidden">
       <div class="glass">
-        <h3>Connection Credentials</h3>
-        <div style="margin-top:10px; font-size:0.82rem; color:#9ca3af;">API Key:</div>
+        <h3 style="font-size: 1.05rem; margin-bottom: 8px;">Your Saved Login &amp; Connection Details</h3>
+        <div class="grid">
+          <div>
+            <label>Username</label>
+            <div class="code-box" id="dashUserBox"></div>
+          </div>
+          <div>
+            <label>Password (save to login again)</label>
+            <div class="code-box" id="dashPassBox"></div>
+          </div>
+        </div>
+        <label>API Key</label>
         <div class="code-box" id="apiKeyBox"></div>
-        <div style="font-size:0.82rem; color:#9ca3af;">Connection URI:</div>
+        <label>Connection URI</label>
         <div class="code-box" id="uriBox"></div>
-        <button class="btn-ghost" onclick="copyText(document.getElementById('uriBox').innerText)">Copy URI</button>
-        <button class="btn-ghost" onclick="loadStats()">Refresh Stats</button>
+        <div class="row">
+          <button class="btn-white" onclick="copyText(document.getElementById('uriBox').innerText)">Copy URI</button>
+          <button class="btn-glass" onclick="copyText(`Username: ${session.username}\nPassword: ${session.password}\nAPI Key: ${session.apiKey}`)">Copy Login Info</button>
+          <button class="btn-glass" onclick="loadStats(); loadSites();">Refresh</button>
+        </div>
       </div>
 
+      <!-- LIVE SITE HOSTING FROM DTZ DB -->
       <div class="glass" style="margin-top: 16px;">
-        <h3>Collections</h3>
+        <h3 style="font-size: 1.05rem; margin-bottom: 4px;">Host a Live Website from DTZ DB</h3>
+        <div class="sub" style="margin-bottom: 10px;">Publish HTML/CSS/JS directly to a live URL</div>
+        <div class="grid">
+          <div>
+            <label>Site Title</label>
+            <input id="siteTitle" value="My DTZ Page" />
+          </div>
+          <div>
+            <label>URL Slug (e.g. my-bot-info)</label>
+            <input id="siteSlug" value="my-bot-info" />
+          </div>
+        </div>
+        <label>HTML Code</label>
+        <textarea id="siteHtml" rows="5">&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;body style="background:#090b10;color:#fff;font-family:sans-serif;padding:30px"&gt;
+  &lt;h1&gt;Live on DTZ DB!&lt;/h1&gt;
+  &lt;p&gt;Hosted directly from DTZ DB console.&lt;/p&gt;
+&lt;/body&gt;&lt;/html&gt;</textarea>
+        <button class="btn-white" onclick="publishSite()">Publish Live Site</button>
+        <div id="sitePublishMsg" class="msg"></div>
+        <div id="sitesList" style="margin-top: 12px;"></div>
+      </div>
+
+      <!-- COLLECTIONS & DOCUMENTS -->
+      <div class="glass" style="margin-top: 16px;">
+        <h3 style="font-size: 1.05rem; margin-bottom: 10px;">Collections</h3>
         <div id="statsGrid" class="grid"></div>
       </div>
 
       <div class="glass" style="margin-top: 16px;">
-        <h3>Quick Insert & Document Viewer</h3>
+        <h3 style="font-size: 1.05rem; margin-bottom: 6px;">Documents &amp; Query Explorer</h3>
         <div class="grid">
           <div>
-            <label style="font-size:0.82rem;">Database</label>
+            <label>Database</label>
             <input id="dbName" value="default_db" />
           </div>
           <div>
-            <label style="font-size:0.82rem;">Collection</label>
-            <input id="colName" placeholder="e.g. users" value="users" />
+            <label>Collection</label>
+            <input id="colName" value="users" />
           </div>
         </div>
-        <label style="font-size:0.82rem;">JSON Document (for Insert)</label>
+
+        <label>Filter JSON (optional, e.g. {"coins":{"$gte":50}})</label>
+        <input id="filterJson" value="{}" />
+
+        <label>Insert Document JSON</label>
         <textarea id="jsonDoc" rows="3">{"name":"Sithuwa","role":"owner","coins":100}</textarea>
+
         <div class="row">
-          <button class="btn-green" onclick="insertDoc()">Insert Document</button>
-          <button class="btn-ghost" onclick="loadDocs()">Load Documents</button>
+          <button class="btn-white" onclick="insertDoc()">Insert Document</button>
+          <button class="btn-glass" onclick="loadDocs()">Find Documents</button>
         </div>
         <div id="docsList" style="margin-top: 12px;"></div>
       </div>
@@ -124,31 +213,36 @@
   </div>
 
   <script>
-    let isRegister = false;
     let session = JSON.parse(localStorage.getItem('dtz_db_session') || 'null');
-
     if (session) showDashboard();
 
-    function toggleAuthMode() {
-      isRegister = !isRegister;
-      document.getElementById('authTitle').innerText = isRegister ? 'Register DTZ DB Account' : 'Login to DTZ DB';
-      document.getElementById('authSubmit').innerText = isRegister ? 'Register' : 'Login';
-      document.getElementById('toggleAuthBtn').innerText = isRegister ? 'Back to Login' : 'Create Account';
-      document.getElementById('authMsg').innerText = '';
+    async function autoGenerateAccount() {
+      document.getElementById('authMsg').innerText = 'Generating account...';
+      const res = await fetch('/api/auth/auto-register', { method: 'POST' });
+      const data = await res.json();
+      if (!data.status) {
+        document.getElementById('authMsg').innerText = data.error || 'Failed to generate';
+        return;
+      }
+      session = data;
+      localStorage.setItem('dtz_db_session', JSON.stringify(data));
+      const box = document.getElementById('autoCredBox');
+      box.classList.remove('hidden');
+      box.innerText = `Generated!\nUsername: ${data.username}\nPassword: ${data.password}`;
+      showDashboard();
     }
 
-    async function submitAuth() {
+    async function loginAccount() {
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
       if (!data.status) {
-        document.getElementById('authMsg').innerText = data.error || 'Failed';
+        document.getElementById('authMsg').innerText = data.error || 'Login failed';
         return;
       }
       session = data;
@@ -166,10 +260,16 @@
       document.getElementById('authSection').classList.add('hidden');
       document.getElementById('dashSection').classList.remove('hidden');
       document.getElementById('logoutBtn').classList.remove('hidden');
+      const badge = document.getElementById('userBadge');
+      badge.innerText = '@' + session.username;
+      badge.classList.remove('hidden');
+      document.getElementById('dashUserBox').innerText = session.username;
+      document.getElementById('dashPassBox').innerText = session.password || '(saved account)';
       document.getElementById('apiKeyBox').innerText = session.apiKey;
       document.getElementById('uriBox').innerText = session.connectionUri;
       loadStats();
       loadDocs();
+      loadSites();
     }
 
     function copyText(txt) {
@@ -177,20 +277,66 @@
       alert('Copied!');
     }
 
-    async function loadStats() {
-      const res = await fetch('/api/dashboard/stats', {
+    async function publishSite() {
+      const title = document.getElementById('siteTitle').value;
+      const slug = document.getElementById('siteSlug').value;
+      const html = document.getElementById('siteHtml').value;
+      const res = await fetch('/api/sites/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({ title, slug, html })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('sitePublishMsg');
+      if (!data.status) {
+        msg.innerText = data.error || 'Publish failed';
+        return;
+      }
+      msg.innerHTML = `Live now: <a href="${data.liveUrl}" target="_blank">${data.liveUrl}</a>`;
+      loadSites();
+    }
+
+    async function loadSites() {
+      const res = await fetch('/api/sites/list', { headers: { 'x-api-key': session.apiKey } });
+      const data = await res.json();
+      const wrap = document.getElementById('sitesList');
+      if (!data.sites || data.sites.length === 0) {
+        wrap.innerHTML = '<div class="sub">No live sites published yet.</div>';
+        return;
+      }
+      wrap.innerHTML = data.sites.map((s) => `
+        <div class="doc-card">
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <div style="font-weight:700;">${s.title} <span class="sub">(/s/${s.username}/${s.slug})</span></div>
+              <div class="sub"><a href="${s.liveUrl}" target="_blank">${s.liveUrl}</a></div>
+            </div>
+            <button class="btn-glass" style="padding:5px 11px; font-size:0.76rem;" onclick="deleteSite('${s.slug}')">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function deleteSite(slug) {
+      await fetch(`/api/sites/${encodeURIComponent(slug)}`, {
+        method: 'DELETE',
         headers: { 'x-api-key': session.apiKey }
       });
+      loadSites();
+    }
+
+    async function loadStats() {
+      const res = await fetch('/api/dashboard/stats', { headers: { 'x-api-key': session.apiKey } });
       const data = await res.json();
       const grid = document.getElementById('statsGrid');
       if (!data.stats || data.stats.length === 0) {
-        grid.innerHTML = '<div style="color:#9ca3af; font-size:0.88rem;">No collections yet. Insert a document below!</div>';
+        grid.innerHTML = '<div class="sub">No collections yet. Insert a document below.</div>';
         return;
       }
-      grid.innerHTML = data.stats.map(s => `
-        <div class="doc-card" onclick="selectCollection('${s.db_name}','${s.collection_name}')" style="cursor:pointer;">
+      grid.innerHTML = data.stats.map((s) => `
+        <div class="col-card" onclick="selectCollection('${s.db_name}','${s.collection_name}')">
           <div style="font-weight:700; color:#fff;">${s.collection_name}</div>
-          <div style="font-size:0.78rem; color:#9ca3af;">DB: ${s.db_name} • Docs: ${s.doc_count}</div>
+          <div class="sub">DB: ${s.db_name} • Docs: ${s.doc_count}</div>
         </div>
       `).join('');
     }
@@ -204,7 +350,7 @@
     async function insertDoc() {
       let parsed;
       try { parsed = JSON.parse(document.getElementById('jsonDoc').value); }
-      catch { return alert('Invalid JSON!'); }
+      catch { return alert('Invalid JSON document'); }
 
       const res = await fetch('/api/v1/action/insertOne', {
         method: 'POST',
@@ -223,26 +369,58 @@
     async function loadDocs() {
       const col = document.getElementById('colName').value;
       if (!col) return;
+      let filter = {};
+      const rawFilter = document.getElementById('filterJson').value.trim();
+      if (rawFilter) {
+        try { filter = JSON.parse(rawFilter); }
+        catch { return alert('Invalid Filter JSON'); }
+      }
+
       const res = await fetch('/api/dashboard/docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
-        body: JSON.stringify({ database: document.getElementById('dbName').value, collection: col })
+        body: JSON.stringify({
+          database: document.getElementById('dbName').value,
+          collection: col,
+          filter
+        })
       });
       const data = await res.json();
       const list = document.getElementById('docsList');
       if (!data.documents || data.documents.length === 0) {
-        list.innerHTML = '<div style="color:#9ca3af; font-size:0.85rem;">No documents in this collection.</div>';
+        list.innerHTML = '<div class="sub" style="margin-top:10px;">No matching documents found.</div>';
         return;
       }
-      list.innerHTML = data.documents.map(d => `
+      list.innerHTML = data.documents.map((d) => `
         <div class="doc-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:0.75rem; color:#9ca3af;">ID: ${d._id}</span>
-            <button class="btn-ghost" style="padding:4px 10px; font-size:0.75rem; color:#fca5a5;" onclick="delDoc('${d._id}')">Delete</button>
+          <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+            <span class="sub">_id: ${d._id}</span>
+            <div class="row">
+              <button class="btn-glass" style="padding:5px 11px; font-size:0.76rem;" onclick="editDoc('${d._id}', encodeURIComponent(JSON.stringify(d.data, null, 2)))">Edit</button>
+              <button class="btn-glass" style="padding:5px 11px; font-size:0.76rem;" onclick="delDoc('${d._id}')">Delete</button>
+            </div>
           </div>
           <pre>${JSON.stringify(d.data, null, 2)}</pre>
         </div>
       `).join('');
+    }
+
+    async function editDoc(id, encodedJson) {
+      const current = decodeURIComponent(encodedJson);
+      const nextText = prompt('Edit Document JSON:', current);
+      if (nextText === null) return;
+      let parsed;
+      try { parsed = JSON.parse(nextText); }
+      catch { return alert('Invalid JSON'); }
+
+      const res = await fetch(`/api/dashboard/docs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({ data: parsed })
+      });
+      const data = await res.json();
+      if (data.status) loadDocs();
+      else alert(data.error);
     }
 
     async function delDoc(id) {
