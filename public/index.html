@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DTZ DB — Cloud NoSQL Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top left, rgba(239, 68, 68, 0.16), transparent 40%),
+                  radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.14), transparent 45%),
+                  #07090d;
+      color: #e5e7eb;
+      padding: 20px;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+    .glass {
+      background: rgba(17, 22, 31, 0.72);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .brand { font-size: 1.4rem; font-weight: 800; letter-spacing: 1px; color: #fff; }
+    .brand span { color: #ef4444; }
+    .badge { font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    input, textarea, select {
+      width: 100%; padding: 11px 13px; border-radius: 10px;
+      background: rgba(8, 11, 17, 0.85); border: 1px solid rgba(255,255,255,0.12);
+      color: #fff; margin-top: 6px; margin-bottom: 12px; font-size: 0.92rem;
+    }
+    button {
+      cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px;
+      font-weight: 600; font-size: 0.9rem; transition: 0.18s;
+    }
+    .btn-red { background: #ef4444; color: #fff; }
+    .btn-red:hover { background: #dc2626; }
+    .btn-green { background: #22c55e; color: #052e16; }
+    .btn-ghost { background: rgba(255,255,255,0.07); color: #e5e7eb; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+    .code-box {
+      background: #05070a; border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 12px; border-radius: 10px; font-family: monospace;
+      font-size: 0.82rem; color: #86efac; word-break: break-all; margin: 8px 0;
+    }
+    .doc-card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 12px; margin-top: 10px;
+    }
+    pre { font-family: monospace; font-size: 0.8rem; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; }
+    .hidden { display: none; }
+    .msg { margin-top: 8px; font-size: 0.85rem; color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="glass header">
+      <div>
+        <div class="brand">DTZ <span>DB</span></div>
+        <div style="font-size: 0.8rem; color: #9ca3af;">MongoDB-Style Cloud NoSQL Engine</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="badge">● ONLINE</span>
+        <button id="logoutBtn" class="btn-ghost hidden" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- AUTH CARD -->
+    <div id="authSection" class="glass" style="max-width: 440px; margin: 30px auto;">
+      <h2 id="authTitle" style="margin-bottom: 14px;">Login to DTZ DB</h2>
+      <label style="font-size:0.85rem;">Username</label>
+      <input id="username" placeholder="e.g. sithuwa" />
+      <label style="font-size:0.85rem;">Password</label>
+      <input id="password" type="password" placeholder="••••••••" />
+      <div class="row">
+        <button id="authSubmit" class="btn-red" style="flex:1;" onclick="submitAuth()">Login</button>
+        <button class="btn-ghost" onclick="toggleAuthMode()" id="toggleAuthBtn">Create Account</button>
+      </div>
+      <div id="authMsg" class="msg"></div>
+    </div>
+
+    <!-- DASHBOARD SECTION -->
+    <div id="dashSection" class="hidden">
+      <div class="glass">
+        <h3>Connection Credentials</h3>
+        <div style="margin-top:10px; font-size:0.82rem; color:#9ca3af;">API Key:</div>
+        <div class="code-box" id="apiKeyBox"></div>
+        <div style="font-size:0.82rem; color:#9ca3af;">Connection URI:</div>
+        <div class="code-box" id="uriBox"></div>
+        <button class="btn-ghost" onclick="copyText(document.getElementById('uriBox').innerText)">Copy URI</button>
+        <button class="btn-ghost" onclick="loadStats()">Refresh Stats</button>
+      </div>
+
+      <div class="glass" style="margin-top: 16px;">
+        <h3>Collections</h3>
+        <div id="statsGrid" class="grid"></div>
+      </div>
+
+      <div class="glass" style="margin-top: 16px;">
+        <h3>Quick Insert & Document Viewer</h3>
+        <div class="grid">
+          <div>
+            <label style="font-size:0.82rem;">Database</label>
+            <input id="dbName" value="default_db" />
+          </div>
+          <div>
+            <label style="font-size:0.82rem;">Collection</label>
+            <input id="colName" placeholder="e.g. users" value="users" />
+          </div>
+        </div>
+        <label style="font-size:0.82rem;">JSON Document (for Insert)</label>
+        <textarea id="jsonDoc" rows="3">{"name":"Sithuwa","role":"owner","coins":100}</textarea>
+        <div class="row">
+          <button class="btn-green" onclick="insertDoc()">Insert Document</button>
+          <button class="btn-ghost" onclick="loadDocs()">Load Documents</button>
+        </div>
+        <div id="docsList" style="margin-top: 12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isRegister = false;
+    let session = JSON.parse(localStorage.getItem('dtz_db_session') || 'null');
+
+    if (session) showDashboard();
+
+    function toggleAuthMode() {
+      isRegister = !isRegister;
+      document.getElementById('authTitle').innerText = isRegister ? 'Register DTZ DB Account' : 'Login to DTZ DB';
+      document.getElementById('authSubmit').innerText = isRegister ? 'Register' : 'Login';
+      document.getElementById('toggleAuthBtn').innerText = isRegister ? 'Back to Login' : 'Create Account';
+      document.getElementById('authMsg').innerText = '';
+    }
+
+    async function submitAuth() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!data.status) {
+        document.getElementById('authMsg').innerText = data.error || 'Failed';
+        return;
+      }
+      session = data;
+      localStorage.setItem('dtz_db_session', JSON.stringify(data));
+      showDashboard();
+    }
+
+    function logout() {
+      localStorage.removeItem('dtz_db_session');
+      session = null;
+      location.reload();
+    }
+
+    function showDashboard() {
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('dashSection').classList.remove('hidden');
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      document.getElementById('apiKeyBox').innerText = session.apiKey;
+      document.getElementById('uriBox').innerText = session.connectionUri;
+      loadStats();
+      loadDocs();
+    }
+
+    function copyText(txt) {
+      navigator.clipboard.writeText(txt);
+      alert('Copied!');
+    }
+
+    async function loadStats() {
+      const res = await fetch('/api/dashboard/stats', {
+        headers: { 'x-api-key': session.apiKey }
+      });
+      const data = await res.json();
+      const grid = document.getElementById('statsGrid');
+      if (!data.stats || data.stats.length === 0) {
+        grid.innerHTML = '<div style="color:#9ca3af; font-size:0.88rem;">No collections yet. Insert a document below!</div>';
+        return;
+      }
+      grid.innerHTML = data.stats.map(s => `
+        <div class="doc-card" onclick="selectCollection('${s.db_name}','${s.collection_name}')" style="cursor:pointer;">
+          <div style="font-weight:700; color:#fff;">${s.collection_name}</div>
+          <div style="font-size:0.78rem; color:#9ca3af;">DB: ${s.db_name} • Docs: ${s.doc_count}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectCollection(db, col) {
+      document.getElementById('dbName').value = db;
+      document.getElementById('colName').value = col;
+      loadDocs();
+    }
+
+    async function insertDoc() {
+      let parsed;
+      try { parsed = JSON.parse(document.getElementById('jsonDoc').value); }
+      catch { return alert('Invalid JSON!'); }
+
+      const res = await fetch('/api/v1/action/insertOne', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({
+          database: document.getElementById('dbName').value,
+          collection: document.getElementById('colName').value,
+          document: parsed
+        })
+      });
+      const data = await res.json();
+      if (data.status) { loadStats(); loadDocs(); }
+      else alert(data.error);
+    }
+
+    async function loadDocs() {
+      const col = document.getElementById('colName').value;
+      if (!col) return;
+      const res = await fetch('/api/dashboard/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': session.apiKey },
+        body: JSON.stringify({ database: document.getElementById('dbName').value, collection: col })
+      });
+      const data = await res.json();
+      const list = document.getElementById('docsList');
+      if (!data.documents || data.documents.length === 0) {
+        list.innerHTML = '<div style="color:#9ca3af; font-size:0.85rem;">No documents in this collection.</div>';
+        return;
+      }
+      list.innerHTML = data.documents.map(d => `
+        <div class="doc-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:0.75rem; color:#9ca3af;">ID: ${d._id}</span>
+            <button class="btn-ghost" style="padding:4px 10px; font-size:0.75rem; color:#fca5a5;" onclick="delDoc('${d._id}')">Delete</button>
+          </div>
+          <pre>${JSON.stringify(d.data, null, 2)}</pre>
+        </div>
+      `).join('');
+    }
+
+    async function delDoc(id) {
+      await fetch(`/api/dashboard/docs/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-api-key': session.apiKey }
+      });
+      loadStats();
+      loadDocs();
+    }
+  </script>
+</body>
+</html>
