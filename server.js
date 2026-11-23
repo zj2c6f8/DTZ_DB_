@@ -13,11 +13,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let dbReady = false;
 async function ensureDB(req, res, next) {
-  if (!dbReady) {
-    await initDB();
-    dbReady = true;
+  try {
+    if (!dbReady) {
+      await initDB();
+      dbReady = true;
+    }
+    next();
+  } catch (err) {
+    console.error('DB Init Error:', err);
+    res.status(500).json({ status: false, error: 'Database connection/init failed: ' + err.message });
   }
-  next();
 }
 app.use(ensureDB);
 
@@ -46,25 +51,29 @@ function sanitizeSlug(input) {
 }
 
 async function authMiddleware(req, res, next) {
-  const apiKey = req.headers['x-api-key'] || req.body.apiKey || req.query.apiKey;
-  if (!apiKey) {
-    return res.status(401).json({ status: false, error: 'DTZ DB Error: Missing API Key' });
+  try {
+    const apiKey = req.headers['x-api-key'] || req.body.apiKey || req.query.apiKey;
+    if (!apiKey) {
+      return res.status(401).json({ status: false, error: 'DTZ DB Error: Missing API Key' });
+    }
+    const result = await pool.query('SELECT * FROM dtz_users WHERE api_key = $1', [apiKey]);
+    if (result.rows.length === 0) {
+      return res.status(403).json({ status: false, error: 'DTZ DB Error: Invalid API Key' });
+    }
+    req.user = result.rows[0];
+    next();
+  } catch (err) {
+    res.status(500).json({ status: false, error: 'Auth check error: ' + err.message });
   }
-  const result = await pool.query('SELECT * FROM dtz_users WHERE api_key = $1', [apiKey]);
-  if (result.rows.length === 0) {
-    return res.status(403).json({ status: false, error: 'DTZ DB Error: Invalid API Key' });
-  }
-  req.user = result.rows[0];
-  next();
 }
 
 // ================= AUTH & AUTO CREDENTIALS =================
 
-// Auto-generate Username + Password + API Key
 app.post('/api/auth/auto-register', async (req, res) => {
   try {
     let created = null;
-    for (let i = 0; i < 5; i++) {
+    let lastErr = '';
+    for (let i = 0; i < 6; i++) {
       const { username, password } = generateAutoCredentials();
       const apiKey = generateApiKey();
       try {
@@ -74,11 +83,13 @@ app.post('/api/auth/auto-register', async (req, res) => {
         );
         created = result.rows[0];
         break;
-      } catch {}
+      } catch (e) {
+        lastErr = e.message;
+      }
     }
 
     if (!created) {
-      return res.status(500).json({ status: false, error: 'Could not generate unique credentials' });
+      return res.status(500).json({ status: false, error: 'Auto-register failed: ' + lastErr });
     }
 
     const host = req.headers['x-forwarded-host'] || req.get('host');
@@ -91,21 +102,21 @@ app.post('/api/auth/auto-register', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: false, error: 'Auto-register failed' });
+    res.status(500).json({ status: false, error: 'Server error during auto-register: ' + err.message });
   }
 });
 
-// Custom Register (optional)
 app.post('/api/auth/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ status: false, error: 'Username & password required' });
   }
   try {
+    const cleanUser = String(username).trim().toLowerCase();
     const apiKey = generateApiKey();
     const result = await pool.query(
       'INSERT INTO dtz_users (username, password, api_key) VALUES ($1, $2, $3) RETURNING username, password, api_key',
-      [String(username).trim().toLowerCase(), password, apiKey]
+      [cleanUser, String(password), apiKey]
     );
     const host = req.headers['x-forwarded-host'] || req.get('host');
     res.json({
@@ -115,29 +126,33 @@ app.post('/api/auth/register', async (req, res) => {
       apiKey: result.rows[0].api_key,
       connectionUri: `dtzdb://${result.rows[0].api_key}@${host}/default_db`
     });
-  } catch {
-    res.status(400).json({ status: false, error: 'Username already exists!' });
+  } catch (err) {
+    res.status(400).json({ status: false, error: 'Username already exists or invalid input' });
   }
 });
 
-// Login with Username + Password
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
-  const result = await pool.query(
-    'SELECT username, password, api_key FROM dtz_users WHERE username = $1 AND password = $2',
-    [String(username || '').trim().toLowerCase(), password]
-  );
-  if (result.rows.length === 0) {
-    return res.status(401).json({ status: false, error: 'Invalid username or password' });
+  try {
+    const { username, password } = req.body || {};
+    const cleanUser = String(username || '').trim().toLowerCase();
+    const result = await pool.query(
+      'SELECT username, password, api_key FROM dtz_users WHERE username = $1 AND password = $2',
+      [cleanUser, String(password || '')]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ status: false, error: 'Invalid username or password' });
+    }
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    res.json({
+      status: true,
+      username: result.rows[0].username,
+      password: result.rows[0].password,
+      apiKey: result.rows[0].api_key,
+      connectionUri: `dtzdb://${result.rows[0].api_key}@${host}/default_db`
+    });
+  } catch (err) {
+    res.status(500).json({ status: false, error: 'Login failed: ' + err.message });
   }
-  const host = req.headers['x-forwarded-host'] || req.get('host');
-  res.json({
-    status: true,
-    username: result.rows[0].username,
-    password: result.rows[0].password,
-    apiKey: result.rows[0].api_key,
-    connectionUri: `dtzdb://${result.rows[0].api_key}@${host}/default_db`
-  });
 });
 
 // ================= DASHBOARD & LIVE SITE HOSTING =================
@@ -154,7 +169,7 @@ app.get('/api/dashboard/stats', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/dashboard/docs', authMiddleware, async (req, res) => {
-  const { database = 'default_db', collection, filter = {} } = req.body;
+  const { database = 'default_db', collection, filter = {} } = req.body || {};
   if (!collection) return res.status(400).json({ status: false, error: 'Collection required' });
   const result = await pool.query(
     `SELECT _id, data, created_at, updated_at
@@ -168,7 +183,7 @@ app.post('/api/dashboard/docs', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/dashboard/docs/:id', authMiddleware, async (req, res) => {
-  const { data } = req.body;
+  const { data } = req.body || {};
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ status: false, error: 'Valid JSON object required' });
   }
@@ -194,9 +209,8 @@ app.delete('/api/dashboard/docs/:id', authMiddleware, async (req, res) => {
   res.json({ status: true, deleted: true });
 });
 
-// Publish / Update a Live HTML Site from DTZ DB
 app.post('/api/sites/publish', authMiddleware, async (req, res) => {
-  const { title = 'DTZ Live Site', slug: rawSlug, html } = req.body;
+  const { title = 'DTZ Live Site', slug: rawSlug, html } = req.body || {};
   if (!html || typeof html !== 'string' || !html.trim()) {
     return res.status(400).json({ status: false, error: 'HTML content is required' });
   }
@@ -215,11 +229,9 @@ app.post('/api/sites/publish', authMiddleware, async (req, res) => {
   const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.headers['x-forwarded-host'] || req.get('host');
   const liveUrl = `${proto}://${host}/s/${username}/${slug}`;
-
   res.json({ status: true, site: saved.rows[0], liveUrl });
 });
 
-// List user's Live Sites
 app.get('/api/sites/list', authMiddleware, async (req, res) => {
   const rows = await pool.query(
     `SELECT id, username, slug, title, updated_at
@@ -235,17 +247,12 @@ app.get('/api/sites/list', authMiddleware, async (req, res) => {
   res.json({ status: true, sites });
 });
 
-// Delete a Live Site
 app.delete('/api/sites/:slug', authMiddleware, async (req, res) => {
   const slug = sanitizeSlug(req.params.slug);
-  await pool.query(
-    'DELETE FROM dtz_sites WHERE api_key = $1 AND slug = $2',
-    [req.user.api_key, slug]
-  );
+  await pool.query('DELETE FROM dtz_sites WHERE api_key = $1 AND slug = $2', [req.user.api_key, slug]);
   res.json({ status: true, deleted: true });
 });
 
-// Serve Published Live Site publicly at /s/:username/:slug
 app.get('/s/:username/:slug', async (req, res) => {
   const username = String(req.params.username || '').toLowerCase();
   const slug = sanitizeSlug(req.params.slug);
@@ -258,6 +265,143 @@ app.get('/s/:username/:slug', async (req, res) => {
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(found.rows[0].html_content);
+});
+
+// ================= BOT TECH FEATURES (SESSION / CONFIG / ECONOMY / QUEUE) =================
+
+// 1. Bot Session Store (save / get / delete)
+app.post('/api/v1/session/set', authMiddleware, async (req, res) => {
+  const { sessionId, payload = {} } = req.body || {};
+  if (!sessionId) return res.status(400).json({ status: false, error: 'sessionId required' });
+  await pool.query(
+    `INSERT INTO dtz_sessions (api_key, session_id, payload, updated_at)
+     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+     ON CONFLICT (api_key, session_id)
+     DO UPDATE SET payload = EXCLUDED.payload, updated_at = CURRENT_TIMESTAMP`,
+    [req.user.api_key, String(sessionId), JSON.stringify(payload)]
+  );
+  res.json({ status: true, sessionId: String(sessionId) });
+});
+
+app.post('/api/v1/session/get', authMiddleware, async (req, res) => {
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.status(400).json({ status: false, error: 'sessionId required' });
+  const row = await pool.query(
+    'SELECT payload, updated_at FROM dtz_sessions WHERE api_key = $1 AND session_id = $2',
+    [req.user.api_key, String(sessionId)]
+  );
+  res.json({ status: true, session: row.rows[0] ? row.rows[0].payload : null });
+});
+
+app.post('/api/v1/session/delete', authMiddleware, async (req, res) => {
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.status(400).json({ status: false, error: 'sessionId required' });
+  await pool.query(
+    'DELETE FROM dtz_sessions WHERE api_key = $1 AND session_id = $2',
+    [req.user.api_key, String(sessionId)]
+  );
+  res.json({ status: true, deleted: true });
+});
+
+// 2. Bot Group/User Config Flags (set / toggle / get)
+app.post('/api/v1/config/set', authMiddleware, async (req, res) => {
+  const { scopeId, settings = {} } = req.body || {};
+  if (!scopeId) return res.status(400).json({ status: false, error: 'scopeId required (e.g. group jid or chat id)' });
+  const current = await pool.query(
+    'SELECT settings FROM dtz_configs WHERE api_key = $1 AND scope_id = $2',
+    [req.user.api_key, String(scopeId)]
+  );
+  const merged = { ...(current.rows[0]?.settings || {}), ...settings };
+  await pool.query(
+    `INSERT INTO dtz_configs (api_key, scope_id, settings, updated_at)
+     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+     ON CONFLICT (api_key, scope_id)
+     DO UPDATE SET settings = EXCLUDED.settings, updated_at = CURRENT_TIMESTAMP`,
+    [req.user.api_key, String(scopeId), JSON.stringify(merged)]
+  );
+  res.json({ status: true, scopeId: String(scopeId), settings: merged });
+});
+
+app.post('/api/v1/config/get', authMiddleware, async (req, res) => {
+  const { scopeId } = req.body || {};
+  if (!scopeId) return res.status(400).json({ status: false, error: 'scopeId required' });
+  const row = await pool.query(
+    'SELECT settings FROM dtz_configs WHERE api_key = $1 AND scope_id = $2',
+    [req.user.api_key, String(scopeId)]
+  );
+  res.json({ status: true, scopeId: String(scopeId), settings: row.rows[0]?.settings || {} });
+});
+
+// 3. Bot Economy helper (add/subtract coins/xp safely in bot_users collection)
+app.post('/api/v1/economy/add', authMiddleware, async (req, res) => {
+  const { userId, coins = 0, xp = 0, database = 'default_db', collection = 'bot_users' } = req.body || {};
+  if (!userId) return res.status(400).json({ status: false, error: 'userId required' });
+
+  const existing = await pool.query(
+    `SELECT _id, data FROM dtz_documents
+     WHERE api_key = $1 AND db_name = $2 AND collection_name = $3 AND data->>'userId' = $4`,
+    [req.user.api_key, database, collection, String(userId)]
+  );
+
+  if (existing.rows.length === 0) {
+    const _id = generateObjectId();
+    const doc = {
+      _id,
+      userId: String(userId),
+      coins: Number(coins) || 0,
+      xp: Number(xp) || 0,
+      level: 1
+    };
+    await pool.query(
+      'INSERT INTO dtz_documents (_id, api_key, db_name, collection_name, data) VALUES ($1, $2, $3, $4, $5)',
+      [_id, req.user.api_key, database, collection, JSON.stringify(doc)]
+    );
+    return res.json({ status: true, user: doc });
+  }
+
+  const row = existing.rows[0];
+  const nextCoins = (Number(row.data.coins) || 0) + (Number(coins) || 0);
+  const nextXp = (Number(row.data.xp) || 0) + (Number(xp) || 0);
+  const nextLevel = Math.max(1, Math.floor(nextXp / 100) + 1);
+  const updated = { ...row.data, coins: nextCoins, xp: nextXp, level: nextLevel };
+
+  await pool.query(
+    'UPDATE dtz_documents SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE _id = $2 AND api_key = $3',
+    [JSON.stringify(updated), row._id, req.user.api_key]
+  );
+  res.json({ status: true, user: updated });
+});
+
+// 4. Bot Broadcast / Job Queue (push / pull / complete)
+app.post('/api/v1/queue/push', authMiddleware, async (req, res) => {
+  const { queueName = 'default_queue', payload = {} } = req.body || {};
+  const ins = await pool.query(
+    'INSERT INTO dtz_queue (api_key, queue_name, payload, status) VALUES ($1, $2, $3, $4) RETURNING id, queue_name, status, created_at',
+    [req.user.api_key, String(queueName), JSON.stringify(payload), 'pending']
+  );
+  res.json({ status: true, job: ins.rows[0] });
+});
+
+app.post('/api/v1/queue/pull', authMiddleware, async (req, res) => {
+  const { queueName = 'default_queue', limit = 10 } = req.body || {};
+  const rows = await pool.query(
+    `SELECT id, queue_name, payload, created_at
+     FROM dtz_queue
+     WHERE api_key = $1 AND queue_name = $2 AND status = 'pending'
+     ORDER BY id ASC LIMIT $3`,
+    [req.user.api_key, String(queueName), Math.min(Number(limit) || 10, 50)]
+  );
+  res.json({ status: true, jobs: rows.rows });
+});
+
+app.post('/api/v1/queue/complete', authMiddleware, async (req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ status: false, error: 'Job id required' });
+  await pool.query(
+    `UPDATE dtz_queue SET status = 'done' WHERE id = $1 AND api_key = $2`,
+    [Number(id), req.user.api_key]
+  );
+  res.json({ status: true, completed: true });
 });
 
 // ================= CORE MONGODB-STYLE CRUD ENGINE =================
@@ -273,7 +417,7 @@ app.post('/api/v1/action/:operation', authMiddleware, async (req, res) => {
     update = {},
     sort = {},
     limit = 0
-  } = req.body;
+  } = req.body || {};
   const apiKey = req.user.api_key;
 
   if (!collection) {
@@ -380,12 +524,12 @@ app.post('/api/v1/action/:operation', authMiddleware, async (req, res) => {
     return res.status(400).json({ status: false, error: `Unknown operation: ${operation}` });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: false, error: 'Internal DTZ DB Engine Error' });
+    res.status(500).json({ status: false, error: 'Internal DTZ DB Engine Error: ' + err.message });
   }
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ service: 'DTZ DB Cloud NoSQL + Site Host Engine', status: 'ONLINE', version: '1.2.0' });
+  res.json({ service: 'DTZ DB Cloud NoSQL + Bot Engine', status: 'ONLINE', version: '1.3.0' });
 });
 
 if (require.main === module) {
