@@ -20,6 +20,10 @@ async function initDB() {
     `);
 
     await client.query(`
+      ALTER TABLE dtz_users ADD COLUMN IF NOT EXISTS password VARCHAR(255);
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS dtz_documents (
         _id VARCHAR(50) PRIMARY KEY,
         api_key VARCHAR(100) NOT NULL,
@@ -41,6 +45,40 @@ async function initDB() {
         html_content TEXT NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(username, slug)
+      );
+    `);
+
+    // Bot Session / Auth Store
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dtz_sessions (
+        api_key VARCHAR(100) NOT NULL,
+        session_id VARCHAR(140) NOT NULL,
+        payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (api_key, session_id)
+      );
+    `);
+
+    // Bot Group / User Config Flags
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dtz_configs (
+        api_key VARCHAR(100) NOT NULL,
+        scope_id VARCHAR(140) NOT NULL,
+        settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (api_key, scope_id)
+      );
+    `);
+
+    // Bot Task / Broadcast Queue
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dtz_queue (
+        id SERIAL PRIMARY KEY,
+        api_key VARCHAR(100) NOT NULL,
+        queue_name VARCHAR(100) NOT NULL,
+        payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
